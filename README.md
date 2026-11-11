@@ -134,6 +134,8 @@ Notable months, compared with the same month in the other years:
 - **Trips are getting longer:** the average trip grew from 2.37 km (2022, 2023) to 2.72 km (2024)
   and 2.77 km (2025).
 
+![Trends by year](docs/images/19_notable_changes.png)
+
 **6. Bikes drain out of Pasila and collect in the centre.** Itämerentori is the busiest station
 (231,327 departures). Pasilan asema loses the most bikes: 27,624 more departures than
 arrivals over five seasons, about 26 bikes every day, so the operator has to keep bringing
@@ -141,6 +143,8 @@ bikes back. Central and
 seaside stations such as Unioninkatu, Hernesaarenranta and Kanavaranta gain bikes.
 
 ![Stations](docs/images/11_dashboard_stations.png)
+
+![Station map](docs/images/25_station_map.png)
 
 **7. Demand can be estimated from the weather forecast.** A simple linear model using
 temperature, rain, day off and the start or end of the season explains 77% of day-to-day
@@ -150,6 +154,8 @@ lets anyone try it.
 **8. Helsinki carries 87% of trips, and its stations work more than twice as hard.**
 Helsinki stations average 29 trips a day each, Espoo stations 13. Both cities react to rain
 (-25%) and to days off (-20%) almost identically. Only 2.7% of trips cross the city border.
+
+![Helsinki vs Espoo](docs/images/28_helsinki_vs_espoo.png)
 
 **9. The busiest routes link homes to campuses and metro stations.** Four of the five busiest
 route pairs have a metro or train station at one end, and the busiest links student housing to a
@@ -166,12 +172,16 @@ university campus. Most are about 1 km: the bike bridges the gap to a fast conne
 
 Purposes are inferred from location and trip length, not from rider data.
 
+![Why these routes](docs/images/27_why_routes.png)
+
 **10. Doubling the free ride time changed how people ride.** 46% of trips take under 10
 minutes and only 3% are round trips. In 2024 the included ride time was doubled from 30 to 60
 minutes in both cities. The share of trips over 30 minutes jumped from 3.1% (2023) to 11.8%
 (2024) and 12.6% (2025), and the average trip grew by about 0.4 km. Days off have more long and
 round trips than working days. Tuesday is the busiest day of the week and Sunday the quietest
 (-23%).
+
+![Ride time change](docs/images/24_ride_time_change.png)
 
 **11. Some days people stay in, some days they go out, and the map shows where.** Compared
 with a normal day: Midsummer Eve, Good Friday, Easter and May Day are quiet ("stay in"
@@ -180,6 +190,8 @@ campus stations more than double, and trips starting at 23:00 run at more than t
 the usual level. Even quiet Midsummer Eve has its hotspot: Seurasaari, home of the
 traditional Midsummer bonfires, gets almost three times its usual arrivals. On Helsinki Day
 the extra trips go to the centre and Linnanmäki.
+
+![Vappu Eve](docs/images/21_special_day_vappu.png)
 
 ### Who this is useful for
 
