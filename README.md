@@ -7,6 +7,8 @@ Python ingestion, Snowflake, dbt, automated tests, CI and a Streamlit dashboard.
 
 ![CI](https://github.com/munyingi/helsinki-citybike-pipeline/actions/workflows/ci.yml/badge.svg)
 
+**Live dashboard:** https://helsinki-citybikes.streamlit.app
+
 ## Architecture
 
 ```
@@ -78,17 +80,19 @@ Definitions and limitations: [docs/metrics.md](docs/metrics.md).
 
 ## Findings
 
-Working days, May to September, unless stated. Each holiday is one day per year, so holiday
-figures rest on 4 or 5 days each and should be read as indications, not proofs.
+Working days across the whole season (April to October), unless stated. Each holiday is one
+day per year, so holiday figures rest on 4 or 5 days each and should be read as indications,
+not proofs. The live dashboard recalculates every number for whichever years you select.
 
 **1. Temperature is the strongest single driver.** Across working days, daily trips rise by
 about 640 for every extra degree of mean temperature (correlation 0.81). Days below 5 °C
 average about 6,100 trips; days of 20 °C and above average about 18,400.
 
-**2. Rain cuts trips by about a fifth, and more as it gets heavier.** Rainy working days
-(1 mm or more) average 22% fewer trips than dry ones. Compared with dry days: under 1 mm is
--9%, 1 to 5 mm is -16%, 5 to 10 mm is -24% and 10 mm or more is -37%. The effect holds within
-every temperature band, so it is not just rain falling on cold days.
+**2. Rain cuts trips by a quarter, and more as it gets heavier.** Rainy working days
+(1 mm or more) average 25% fewer trips than dry ones. Compared with dry days: under 1 mm is
+-15%, 1 to 5 mm is -23%, 5 to 10 mm is -26% and 10 mm or more is -39%. Comparing days of the
+same temperature, rain still costs 8% to 38% of trips, so it is not just rain falling on cold
+days.
 
 ![Weather](docs/images/08_dashboard_weather.png)
 
@@ -105,15 +109,51 @@ and Helsinki Day (12 June) runs at a normal level.
 
 ![Day types](docs/images/09_dashboard_calendar.png)
 
-**5. Use has been stable since 2022.** Valid trips per season: 2.75M (2021), 2.40M (2022),
-2.47M (2023), 2.50M (2024), 2.44M (2025). 2021 is the high point.
+**5. 2021 was a real peak; since then use has been flat and weather decides the year.**
+
+| Year | Trips | Trips/day May-Sep | Mean temp May-Sep | Trips on a comparable day |
+|---|---|---|---|---|
+| 2021 | 2,750,120 | 14,969 | 15.5 °C | 18,731 |
+| 2022 | 2,397,650 | 13,323 | 15.0 °C | 16,150 |
+| 2023 | 2,470,003 | 13,224 | 15.7 °C | 14,899 |
+| 2024 | 2,503,876 | 13,961 | 16.8 °C | 16,074 |
+| 2025 | 2,439,576 | 13,068 | 15.2 °C | 15,433 |
+
+A *comparable day* is a dry working day at 15 to 20 °C, which takes most of the weather out of
+the comparison. On those days 2021 was still 16% to 26% busier than any later year, so its peak
+was demand, not only sunshine. From 2022 on, comparable-day demand moves within about 8%.
+
+Notable months, compared with the same month in the other years:
+
+- **June 2021:** +34%, the warmest June in the data (2.9 °C above the others).
+- **June 2025:** -24%, 3.2 °C colder than usual with rain on 47% of days against 14% usually.
+- **April 2022 and April 2024:** -23% and -31%. 2024 was cold and wet; in 2022 the weather was
+  near normal but 17% fewer stations were in use, which points to a slow start to the season.
+- **Trips are getting longer:** the average trip grew from 2.37 km (2022, 2023) to 2.72 km (2024)
+  and 2.77 km (2025).
 
 **6. Bikes drain out of Pasila and collect in the centre.** Itämerentori is the busiest station
 (231,327 departures). Pasilan asema loses the most bikes: 27,624 more departures than
-arrivals over five seasons, so the operator has to keep bringing bikes back. Central and
+arrivals over five seasons, about 26 bikes every day, so the operator has to keep bringing
+bikes back. Central and
 seaside stations such as Unioninkatu, Hernesaarenranta and Kanavaranta gain bikes.
 
 ![Stations](docs/images/11_dashboard_stations.png)
+
+**7. Demand can be estimated from the weather forecast.** A simple linear model using
+temperature, rain, day off and the start or end of the season explains 77% of day-to-day
+variation, with a typical error of about 1,800 trips. The dashboard's *Estimate a day* tab
+lets anyone try it.
+
+### Who this is useful for
+
+- **Riders and residents:** the busiest times are warm, dry working days around 8:00 and
+  16:00 to 17:00; Pasila is the station most likely to be empty.
+- **Operators and businesses:** demand follows the forecast and the calendar, and rebalancing
+  effort concentrates on a handful of stations.
+- **City planners:** one cold or wet month can cut use by a fifth or more, so judge trends on
+  comparable days, not raw totals.
+- **Researchers:** every transformation, test and data-quality decision is in this repo.
 
 ## Data quality
 
