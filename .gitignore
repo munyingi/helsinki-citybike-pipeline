@@ -23,3 +23,7 @@ __pycache__/
 .venv/
 venv/
 .user.yml
+
+# macOS and local clutter
+.DS_Store
+_to_delete/
