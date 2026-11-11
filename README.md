@@ -151,10 +151,20 @@ lets anyone try it.
 Helsinki stations average 29 trips a day each, Espoo stations 13. Both cities react to rain
 (-25%) and to days off (-20%) almost identically. Only 2.7% of trips cross the city border.
 
-**9. The busiest routes are short campus and harbour hops.** The top route is
-Jämeräntaival to Aalto-yliopisto (M) in Otaniemi, Espoo: 35,123 trips at about 0.8 km, with
-almost as many in the other direction. Next come Arielinkatu and Sompasaari in Kalasatama, and
-several routes between Itämerentori and the Länsisatama area.
+**9. The busiest routes link homes to campuses and metro stations.** Four of the five busiest
+route pairs have a metro or train station at one end, and the busiest links student housing to a
+university campus. Most are about 1 km: the bike bridges the gap to a fast connection.
+
+| Route pair (both directions, 2021-2025) | What is at each end | Trips |
+|---|---|---|
+| Jämeräntaival and Aalto-yliopisto (M) | Aalto University student housing (Teekkarikylä) and the Otaniemi campus and metro | 69,187 |
+| Arielinkatu and Sompasaari | Residential Kalasatama, near Kalasatama metro and the Redi shopping centre | 39,914 |
+| Itämerentori and Salmisaarenranta | Ruoholahti metro and offices; the Salmisaari waterfront | 25,058 |
+| Itämerentori and Tyynenmerenkatu | Ruoholahti metro; Jätkäsaari, a large new district with no metro | 24,766 |
+| Leppävaaranaukio and Kössi Koskisen aukio | Leppävaara rail station and the Sello shopping centre, Espoo | 24,614 |
+| Matinkartanontie and Suomenlahdentie | Homes in Matinkylä and Matinkylä metro at Iso Omena, Espoo | 23,033 |
+
+Purposes are inferred from location and trip length, not from rider data.
 
 **10. Doubling the free ride time changed how people ride.** 46% of trips take under 10
 minutes and only 3% are round trips. In 2024 the included ride time was doubled from 30 to 60

@@ -351,21 +351,79 @@ with tabs[3]:
         hol = (pd.DataFrame(rows).groupby("day")
                .agg(diff=("diff", "mean"), trips=("trips", "mean"), n=("trips", "size"))
                .reset_index().dropna(subset=["diff"]))
-        hol["direction"] = np.where(hol["diff"] >= 0, "Busier", "Quieter")
+        hol["direction"] = np.select(
+            [hol["diff"] <= -10, hol["diff"] >= 10],
+            ["People stay in", "People go out"], default="About normal")
         st.subheader("Holidays and special days vs a normal day")
         st.altair_chart(
             alt.Chart(hol).mark_bar().encode(
                 x=alt.X("diff:Q", title="% vs ordinary days in the same month"),
                 y=alt.Y("day:N", sort="x", title=None),
                 color=alt.Color("direction:N", title=None,
-                                scale=alt.Scale(domain=["Busier", "Quieter"])),
+                                scale=alt.Scale(domain=["People stay in", "About normal", "People go out"],
+                                                range=["#5b8def", "#9a9a9a", "#e8743b"])),
                 tooltip=["day:N", alt.Tooltip("diff:Q", format="+.0f", title="% vs normal"),
                          alt.Tooltip("trips:Q", format=",.0f", title="avg trips"),
                          alt.Tooltip("n:Q", title="days")],
             ),
             width="stretch",
         )
-        st.caption("Each holiday happens once a year, so each bar rests on only a few days.")
+        st.caption("Each holiday happens once a year, so each bar rests on only a few days. "
+                   "'Stay in' means at least 10% fewer trips than normal; 'go out' at least 10% more.")
+        stay = ", ".join(hol.loc[hol["direction"] == "People stay in"].sort_values("diff")["day"])
+        out = ", ".join(hol.loc[hol["direction"] == "People go out"].sort_values("diff", ascending=False)["day"])
+        if stay or out:
+            st.markdown(
+                (f"- **Days people stay in:** {stay}.\n" if stay else "")
+                + (f"- **Days people go out:** {out}.\n" if out else "")
+                + "- Even on a quiet holiday, some places get busier. Pick a day below to see where."
+            )
+
+        st.subheader("Where and when do people ride on a special day?")
+        pick_day = st.selectbox("Day", hol.sort_values("diff", ascending=False)["day"].tolist())
+        sp_days = d[d["label"] == pick_day]
+        extra, prof_sp, prof_base = [], [], []
+        for _, r in sp_days.iterrows():
+            base_days = d[(d["year"] == r["year"]) & (d["month"] == r["month"]) & d["label"].isna()
+                          & (d["is_weekend"] == r["is_weekend"])]["trip_date"]
+            if base_days.empty:
+                continue
+            on_day = sd[sd["trip_date"] == r["trip_date"]].groupby("station_id")["arrivals"].sum()
+            usual = sd[sd["trip_date"].isin(base_days)].groupby("station_id")["arrivals"].sum() / len(base_days)
+            extra.append(pd.DataFrame({"on_day": on_day, "usual": usual}).fillna(0))
+            prof_sp.append(h[h["trip_date"] == r["trip_date"]].groupby("departure_hour")["trips"].sum())
+            prof_base.append(h[h["trip_date"].isin(base_days)].groupby("departure_hour")["trips"].sum()
+                             / len(base_days))
+        if extra:
+            ex = sum(extra) / len(extra)
+            ex["extra"] = ex["on_day"] - ex["usual"]
+            ex["Station"] = ex.index.map(stations.set_index("station_id")["station_name"])
+            ex["times"] = ex["on_day"] / ex["usual"].where(ex["usual"] > 0)
+            left_c, right_c = st.columns(2)
+            left_c.markdown(f"**Where people went on {pick_day}** (arrivals vs a normal day)")
+            left_c.dataframe(
+                ex.nlargest(10, "extra")[["Station", "on_day", "usual", "times"]]
+                .rename(columns={"on_day": "Arrivals", "usual": "Normal day", "times": "Times normal"}),
+                hide_index=True, width="stretch",
+                column_config={"Arrivals": st.column_config.NumberColumn(format="%.0f"),
+                               "Normal day": st.column_config.NumberColumn(format="%.0f"),
+                               "Times normal": st.column_config.NumberColumn(format="%.1fx")},
+            )
+            hp = pd.concat([
+                (sum(prof_sp) / len(prof_sp)).rename("trips").reset_index().assign(day=pick_day),
+                (sum(prof_base) / len(prof_base)).rename("trips").reset_index().assign(day="Normal day"),
+            ])
+            right_c.markdown(f"**When people rode on {pick_day}**")
+            right_c.altair_chart(
+                alt.Chart(hp).mark_line(point=True).encode(
+                    x=alt.X("departure_hour:O", title="Hour"),
+                    y=alt.Y("trips:Q", title="Average trips"),
+                    color=alt.Color("day:N", title=None),
+                ),
+                width="stretch",
+            )
+            st.caption("Averaged over the years selected; 'normal day' = ordinary days of the same "
+                       "kind in the same month and year.")
 
     st.subheader("Day of the week")
     ordinary = d[d["label"].isna()]
@@ -561,6 +619,29 @@ with tabs[6]:
             column_config={"Avg minutes": st.column_config.NumberColumn(format="%.1f"),
                            "Avg km": st.column_config.NumberColumn(format="%.2f")},
         )
+        with st.expander("Why are these the busiest routes?", expanded=True):
+            st.markdown(
+                "Four of the five busiest route pairs have a **metro or train station** at one end, "
+                "and the busiest links **student housing to a university campus**. Most are about "
+                "1 km: the bike covers the gap between home and a fast connection.\n\n"
+                "| Route pair (both directions, 2021-2025) | What is at each end | Likely purpose |\n"
+                "|---|---|---|\n"
+                "| Jämeräntaival and Aalto-yliopisto (M) | Aalto University student housing (Teekkarikylä) "
+                "and the Otaniemi campus and metro | Students to lectures and the metro |\n"
+                "| Arielinkatu and Sompasaari | Residential Kalasatama, near Kalasatama metro and the "
+                "Redi shopping centre | Errands and the last leg home |\n"
+                "| Itämerentori and Salmisaarenranta | Ruoholahti metro and offices; the Salmisaari "
+                "waterfront | Commuting to the metro and offices |\n"
+                "| Itämerentori and Tyynenmerenkatu | Ruoholahti metro; Jätkäsaari, a large new district "
+                "with no metro | First and last mile to the metro |\n"
+                "| Leppävaaranaukio and Kössi Koskisen aukio | Leppävaara rail station and the Sello "
+                "shopping centre, Espoo | Train and shopping connection |\n"
+                "| Matinkartanontie and Suomenlahdentie | Homes in Matinkylä and Matinkylä metro at "
+                "Iso Omena, Espoo | First and last mile to the metro |"
+            )
+            st.caption("Place descriptions come from public sources; purposes are inferred from location "
+                       "and trip length, not from rider data.")
+
         st.subheader("Where do people go from a station?")
         options = (routes.groupby("From")["trips"].sum().sort_values(ascending=False).index.tolist())
         if options:
