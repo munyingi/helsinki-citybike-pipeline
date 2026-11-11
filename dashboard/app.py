@@ -21,12 +21,17 @@ st.set_page_config(page_title="Helsinki City Bikes", layout="wide")
 
 
 @st.cache_data
+def _read(path: str, mtime: float) -> pd.DataFrame:
+    # mtime is part of the cache key, so a fresh export is picked up without a restart.
+    return pd.read_parquet(path)
+
+
 def load(name: str) -> pd.DataFrame:
     path = DATA / f"{name}.parquet"
     if not path.exists():
         st.error(f"Missing {path.name}. Run: python scripts/export_marts.py")
         st.stop()
-    return pd.read_parquet(path)
+    return _read(str(path), path.stat().st_mtime)
 
 
 def as_bool(s: pd.Series) -> pd.Series:
@@ -44,6 +49,18 @@ hourly = load("agg_hourly_trips").copy()
 stations = load("dim_station")
 station_daily = load("agg_station_daily").copy()
 quality = load("quality_trip_status")
+
+
+def load_optional(name: str) -> pd.DataFrame | None:
+    path = DATA / f"{name}.parquet"
+    return _read(str(path), path.stat().st_mtime) if path.exists() else None
+
+
+trip_types = load_optional("agg_trip_types")
+od_pairs = load_optional("agg_od_pairs")
+city_flows = load_optional("agg_city_flows")
+HAS_GEO = {"city", "lat", "lon"}.issubset(stations.columns)
+WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 daily["trip_date"] = pd.to_datetime(daily["trip_date"])
 hourly["trip_date"] = pd.to_datetime(hourly["trip_date"])
@@ -99,8 +116,8 @@ slope = (np.polyfit(temp_known["temp_mean_c"], temp_known["trips"], 1)[0]
 dayoff_effect = pct(d.loc[d["is_day_off"] == True, "trips"].mean(),   # noqa: E712
                     d.loc[d["is_day_off"] == False, "trips"].mean())  # noqa: E712
 
-tabs = st.tabs(["Key findings", "Trends by year", "Weather", "Calendar",
-                "Stations", "Estimate a day", "Data quality"])
+tabs = st.tabs(["Key findings", "Trends by year", "Weather", "Calendar", "Trip types",
+                "Stations and map", "Routes", "Helsinki vs Espoo", "Estimate a day", "Data quality"])
 
 # ================================================================ Key findings
 with tabs[0]:
@@ -350,6 +367,24 @@ with tabs[3]:
         )
         st.caption("Each holiday happens once a year, so each bar rests on only a few days.")
 
+    st.subheader("Day of the week")
+    ordinary = d[d["label"].isna()]
+    dow = ordinary.groupby("weekday_name")["trips"].agg(["mean", "size"]).reindex(WEEKDAYS).dropna().reset_index()
+    if not dow.empty:
+        st.altair_chart(
+            alt.Chart(dow).mark_bar().encode(
+                x=alt.X("weekday_name:N", sort=WEEKDAYS, title=None),
+                y=alt.Y("mean:Q", title="Average trips per day"),
+                tooltip=["weekday_name:N", alt.Tooltip("mean:Q", format=",.0f"),
+                         alt.Tooltip("size:Q", title="days")],
+            ),
+            width="stretch",
+        )
+        top, low = dow.loc[dow["mean"].idxmax()], dow.loc[dow["mean"].idxmin()]
+        st.caption(f"Holidays left out. Busiest: {top['weekday_name']} ({top['mean']:,.0f} a day); "
+                   f"quietest: {low['weekday_name']} ({low['mean']:,.0f}), "
+                   f"{pct(low['mean'], top['mean']):+.0f}%.")
+
     st.subheader("Hour by hour: working days vs days off")
     prof = h.groupby(["departure_hour", "is_day_off"])["trips"].sum().reset_index()
     days = h.groupby("is_day_off")["trip_date"].nunique().rename("n_days").reset_index()
@@ -367,8 +402,86 @@ with tabs[3]:
     st.caption("Working days show commute peaks in the morning and late afternoon; "
                "days off build to one afternoon peak.")
 
-# ================================================================ Stations
+# ================================================================ Trip types
 with tabs[4]:
+    st.markdown(
+        "**Question:** what are people using the bikes for? Trip length is a rough guide: "
+        "short one-way hops look like errands or the last leg of a commute; long trips and "
+        "round trips (back to the same station) look like leisure."
+    )
+    if trip_types is None or trip_types.empty:
+        st.info("Trip types appear after the next export (agg_trip_types).")
+    else:
+        tt = trip_types.copy()
+        for col in ["year", "month", "trips", "total_duration_min"]:
+            tt[col] = pd.to_numeric(tt[col], errors="coerce")
+        tt["is_day_off"] = as_bool(tt["is_day_off"])
+        tt["is_round_trip"] = as_bool(tt["is_round_trip"])
+        tt = tt[tt["year"].isin(chosen)]
+        tt["day"] = tt["is_day_off"].map({True: "Day off", False: "Working day"})
+
+        a1, a2, a3 = st.columns(3)
+        total = tt["trips"].sum()
+        a1.metric("Under 10 minutes", f"{100 * tt.loc[tt['duration_band'] < '3', 'trips'].sum() / total:.0f}%")
+        a2.metric("Over 30 minutes", f"{100 * tt.loc[tt['duration_band'] >= '5', 'trips'].sum() / total:.0f}%")
+        a3.metric("Round trips", f"{100 * tt.loc[tt['is_round_trip'] == True, 'trips'].sum() / total:.1f}%")  # noqa: E712
+
+        def shares(col):
+            g = tt.groupby(["day", col])["trips"].sum().reset_index()
+            g["share"] = g["trips"] / g.groupby("day")["trips"].transform("sum")
+            g["band"] = g[col].str.split(": ").str[-1]
+            return g
+
+        dur = shares("duration_band")
+        st.subheader("How long are trips?")
+        st.altair_chart(
+            alt.Chart(dur).mark_bar().encode(
+                x=alt.X("band:N", sort=list(dict.fromkeys(dur.sort_values("duration_band")["band"])),
+                        title="Trip duration"),
+                xOffset="day:N",
+                y=alt.Y("share:Q", title="Share of trips", axis=alt.Axis(format="%")),
+                color=alt.Color("day:N", title=None),
+                tooltip=["day:N", "band:N", alt.Tooltip("share:Q", format=".1%"),
+                         alt.Tooltip("trips:Q", format=",")],
+            ),
+            width="stretch",
+        )
+        dist = shares("distance_band")
+        dist = dist[dist["distance_band"] != "0: unknown"]
+        st.subheader("How far do people ride?")
+        st.altair_chart(
+            alt.Chart(dist).mark_bar().encode(
+                x=alt.X("band:N", sort=list(dict.fromkeys(dist.sort_values("distance_band")["band"])),
+                        title="Distance"),
+                xOffset="day:N",
+                y=alt.Y("share:Q", title="Share of trips", axis=alt.Axis(format="%")),
+                color=alt.Color("day:N", title=None),
+                tooltip=["day:N", "band:N", alt.Tooltip("share:Q", format=".1%")],
+            ),
+            width="stretch",
+        )
+        st.subheader("Are trips changing over the years?")
+        yr = tt.groupby("year").apply(lambda g: pd.Series({
+            "Short (under 10 min)": g.loc[g["duration_band"] < "3", "trips"].sum() / g["trips"].sum(),
+            "Long (over 30 min)": g.loc[g["duration_band"] >= "5", "trips"].sum() / g["trips"].sum(),
+            "Round trips": g.loc[g["is_round_trip"] == True, "trips"].sum() / g["trips"].sum(),  # noqa: E712
+        }), include_groups=False).reset_index().melt("year", var_name="type", value_name="share")
+        yr["year"] = yr["year"].astype(int).astype(str)
+        st.altair_chart(
+            alt.Chart(yr).mark_line(point=True).encode(
+                x=alt.X("year:N", title=None),
+                y=alt.Y("share:Q", title="Share of trips", axis=alt.Axis(format="%")),
+                color=alt.Color("type:N", title=None),
+                tooltip=["year:N", "type:N", alt.Tooltip("share:Q", format=".1%")],
+            ),
+            width="stretch",
+        )
+        st.caption("Bands use the trip's own duration and the distance reported by the bike. "
+                   "From 2024 the included ride time was doubled from 30 to 60 minutes, which is "
+                   "when the share of trips over 30 minutes jumps.")
+
+# ================================================================ Stations
+with tabs[5]:
     st.markdown(
         "**Question:** where do bikes pile up or run out? A station that loses bikes every day "
         "needs the operator to bring them back by van."
@@ -404,8 +517,145 @@ with tabs[4]:
     st.caption("Net flow = arrivals minus departures from riders' trips; the operator's own "
                "redistribution is not in the data.")
 
+    st.subheader("Map: where bikes run out and pile up")
+    if HAS_GEO:
+        geo = totals.merge(stations[["station_id", "lat", "lon", "city"]], on="station_id", how="left")
+        geo = geo.dropna(subset=["lat", "lon"]).copy()
+        lim = max(geo["net_per_day"].abs().quantile(0.95), 1)
+        geo["color"] = geo["net_per_day"].map(
+            lambda v: "#d6404e" if v <= -lim / 4 else ("#2b7bd6" if v >= lim / 4 else "#9a9a9a"))
+        geo["size"] = 20 + 160 * (geo["departures"] / geo["departures"].max()) ** 0.5
+        st.map(geo, latitude="lat", longitude="lon", color="color", size="size")
+        st.caption("Red: loses bikes; blue: gains bikes; grey: roughly balanced. "
+                   f"Dot size shows departures. {len(geo):,} stations with known coordinates. "
+                   "Locations come from HSL's 2021 station list, so a few stations that later moved "
+                   "are shown at their old spot.")
+    else:
+        st.info("The map appears once the station coordinates seed is loaded.")
+
+# ================================================================ Routes
+with tabs[6]:
+    st.markdown(
+        "**Question:** which trips do people actually make? Each route is a station-to-station "
+        "pair; routes with fewer than 10 trips in a year are not published."
+    )
+    if od_pairs is None or od_pairs.empty:
+        st.info("Routes appear after the next export (agg_od_pairs).")
+    else:
+        od = od_pairs.copy()
+        for col in ["year", "trips", "avg_duration_min", "avg_distance_km"]:
+            od[col] = pd.to_numeric(od[col], errors="coerce")
+        od = od[od["year"].isin(chosen)]
+        names = stations.set_index("station_id")["station_name"]
+        routes = (od.groupby(["departure_station_id", "return_station_id"])
+                  .agg(trips=("trips", "sum"), minutes=("avg_duration_min", "mean"),
+                       km=("avg_distance_km", "mean")).reset_index())
+        routes["From"] = routes["departure_station_id"].map(names)
+        routes["To"] = routes["return_station_id"].map(names)
+        one_way = routes[routes["departure_station_id"] != routes["return_station_id"]]
+        st.subheader("Most popular routes")
+        st.dataframe(
+            one_way.nlargest(20, "trips")[["From", "To", "trips", "minutes", "km"]]
+            .rename(columns={"trips": "Trips", "minutes": "Avg minutes", "km": "Avg km"}),
+            hide_index=True, width="stretch",
+            column_config={"Avg minutes": st.column_config.NumberColumn(format="%.1f"),
+                           "Avg km": st.column_config.NumberColumn(format="%.2f")},
+        )
+        st.subheader("Where do people go from a station?")
+        options = (routes.groupby("From")["trips"].sum().sort_values(ascending=False).index.tolist())
+        if options:
+            pick = st.selectbox("Station", options)
+            dest = routes[routes["From"] == pick].nlargest(10, "trips")
+            st.altair_chart(
+                alt.Chart(dest).mark_bar().encode(
+                    x=alt.X("trips:Q", title="Trips"),
+                    y=alt.Y("To:N", sort="-x", title=None),
+                    tooltip=["To:N", "trips:Q", alt.Tooltip("minutes:Q", format=".1f")],
+                ),
+                width="stretch",
+            )
+            st.caption("Top 10 destinations. A bar with the same name is a round trip.")
+
+# ================================================================ Helsinki vs Espoo
+with tabs[7]:
+    st.markdown(
+        "**Question:** do the two cities use the bikes differently? Helsinki is dense; Espoo is "
+        "more suburban, with longer distances between stations."
+    )
+    if not HAS_GEO:
+        st.info("This comparison appears once the station city seed is loaded.")
+    else:
+        city_of = stations.set_index("station_id")["city"]
+        sc = sd.assign(city=sd["station_id"].map(city_of))
+        sc = sc[sc["city"].isin(["Helsinki", "Espoo"])]
+        per = (sc.groupby(["city", "trip_date"])["departures"].sum().reset_index()
+               .merge(d[["trip_date", "year", "is_day_off", "is_rainy_day", "temp_mean_c"]],
+                      on="trip_date", how="left"))
+        n_st = sc[sc["departures"] > 0].groupby("city")["station_id"].nunique()
+        summary_c = per.groupby("city").agg(trips=("departures", "sum"),
+                                            per_day=("departures", "mean")).reset_index()
+        summary_c["stations"] = summary_c["city"].map(n_st)
+        summary_c["per_station_day"] = summary_c["per_day"] / summary_c["stations"]
+        summary_c["share"] = summary_c["trips"] / summary_c["trips"].sum()
+        rain_c = {}
+        for c, g in per[per["is_day_off"] == False].dropna(subset=["is_rainy_day"]).groupby("city"):  # noqa: E712
+            rain_c[c] = pct(g.loc[g["is_rainy_day"] == True, "departures"].mean(),   # noqa: E712
+                            g.loc[g["is_rainy_day"] == False, "departures"].mean())  # noqa: E712
+        dayoff_c = {c: pct(g.loc[g["is_day_off"] == True, "departures"].mean(),   # noqa: E712
+                           g.loc[g["is_day_off"] == False, "departures"].mean())  # noqa: E712
+                    for c, g in per.groupby("city")}
+        summary_c["rain"] = summary_c["city"].map(rain_c)
+        summary_c["dayoff"] = summary_c["city"].map(dayoff_c)
+        st.dataframe(
+            summary_c.rename(columns={
+                "city": "City", "trips": "Trips started", "share": "Share",
+                "stations": "Stations used", "per_day": "Trips/day",
+                "per_station_day": "Trips per station per day",
+                "rain": "Rainy working day", "dayoff": "Day off vs working day"}),
+            hide_index=True, width="stretch",
+            column_config={
+                "Trips started": st.column_config.NumberColumn(format="%d"),
+                "Share": st.column_config.NumberColumn(format="percent"),
+                "Trips/day": st.column_config.NumberColumn(format="%d"),
+                "Trips per station per day": st.column_config.NumberColumn(format="%.1f"),
+                "Rainy working day": st.column_config.NumberColumn(format="%+.0f%%"),
+                "Day off vs working day": st.column_config.NumberColumn(format="%+.0f%%"),
+            },
+        )
+        st.caption("Trips are counted in the city where they start. Percentages compare average "
+                   "trips per day.")
+
+        st.subheader("Each season by city")
+        mc = per.assign(month=per["trip_date"].dt.month, year=per["trip_date"].dt.year)
+        mc = mc.groupby(["city", "year"])["departures"].mean().reset_index()
+        mc["year"] = mc["year"].astype(str)
+        st.altair_chart(
+            alt.Chart(mc).mark_bar().encode(
+                x=alt.X("year:N", title=None),
+                xOffset="city:N",
+                y=alt.Y("departures:Q", title="Average trips per day"),
+                color=alt.Color("city:N", title=None),
+                tooltip=["city:N", "year:N", alt.Tooltip("departures:Q", format=",.0f")],
+            ),
+            width="stretch",
+        )
+
+        if city_flows is not None and not city_flows.empty:
+            cf = city_flows.copy()
+            cf["year"] = pd.to_numeric(cf["year"], errors="coerce")
+            cf["trips"] = pd.to_numeric(cf["trips"], errors="coerce")
+            cf = cf[cf["year"].isin(chosen)]
+            cf = cf[cf["departure_city"].isin(["Helsinki", "Espoo"]) & cf["return_city"].isin(["Helsinki", "Espoo"])]
+            flows = cf.groupby(["departure_city", "return_city"])["trips"].sum().reset_index()
+            flows["share"] = flows["trips"] / flows["trips"].sum()
+            st.subheader("Trips between the cities")
+            st.dataframe(flows.rename(columns={"departure_city": "From", "return_city": "To",
+                                               "trips": "Trips", "share": "Share"}),
+                         hide_index=True, width="stretch",
+                         column_config={"Share": st.column_config.NumberColumn(format="percent")})
+
 # ================================================================ Estimate a day
-with tabs[5]:
+with tabs[8]:
     st.markdown(
         "**Question:** how many trips should we expect tomorrow? A simple linear model fitted "
         "on the selected years: temperature, rain, day off and whether it is April or October."
@@ -444,7 +694,7 @@ with tabs[5]:
         st.info("Not enough days with weather data in the selected years.")
 
 # ================================================================ Data quality
-with tabs[6]:
+with tabs[9]:
     st.markdown(
         "**Question:** can the numbers be trusted? Every raw row is labelled, nothing is "
         "dropped silently, and yearly totals are checked against the city's published figures."

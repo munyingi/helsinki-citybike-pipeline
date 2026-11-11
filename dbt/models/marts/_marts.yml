@@ -54,6 +54,26 @@ models:
       - name: station_name
         description: Most recently used name for the station.
         data_tests: [not_null]
+      - name: city
+        description: Helsinki or Espoo from HSL's station list; Other for workshop and test stations.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Helsinki", "Espoo", "Other"]
+      - name: lat
+        description: Latitude (WGS84) from HSL's 2021 station list. Null if the id is not in the list.
+        data_tests:
+          - value_between:
+              arguments:
+                min_value: 60.0
+                max_value: 60.5
+      - name: lon
+        data_tests:
+          - value_between:
+              arguments:
+                min_value: 24.5
+                max_value: 25.5
 
   - name: dim_date
     description: Calendar 2021-2026 with Finnish holidays, special days and FMI weather (Kaisaniemi).
@@ -98,6 +118,37 @@ models:
           arguments:
             columns: ["trip_date", "station_id"]
 
+  - name: agg_trip_types
+    description: Trips by duration band, distance band, round trip or not, day off or not, per month. Safe to publish.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: ["year", "month", "is_day_off", "duration_band", "distance_band", "is_round_trip"]
+    columns:
+      - name: trips
+        data_tests: [not_null]
+
+  - name: agg_od_pairs
+    description: Station-to-station routes per year with at least 10 trips. Safe to publish.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: ["year", "departure_station_id", "return_station_id"]
+    columns:
+      - name: trips
+        data_tests:
+          - value_between:
+              arguments:
+                min_value: 10
+                max_value: 1000000
+
+  - name: agg_city_flows
+    description: Trips per year between and within Helsinki and Espoo. Safe to publish.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: ["year", "departure_city", "return_city"]
+
 exposures:
   - name: citybike_dashboard
     type: dashboard
@@ -109,5 +160,8 @@ exposures:
       - ref('agg_hourly_trips')
       - ref('agg_station_daily')
       - ref('dim_station')
+      - ref('agg_trip_types')
+      - ref('agg_od_pairs')
+      - ref('agg_city_flows')
     owner:
       name: Samwel Munyingi

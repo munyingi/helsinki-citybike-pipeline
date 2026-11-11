@@ -48,6 +48,14 @@ seeds:
         date_day: date
         special_day_name: varchar
         special_day_type: varchar
+    stations:
+      +column_types:
+        station_id: integer
+        station_name_official: varchar
+        city: varchar
+        capacity: integer
+        lat: double
+        lon: double
     official_trip_totals:
       +column_types:
         year: integer

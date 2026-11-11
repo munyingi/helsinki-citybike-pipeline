@@ -61,6 +61,8 @@ Without Snowflake, add `--target duckdb` to steps 2 to 4.
 |---|---|---|
 | City bike trips (Helsinki + Espoo), 2021-2025 | HSL, City bike stations' Origin-Destination data, owned by City Bike Finland | CC BY 4.0 |
 | Daily weather, Helsinki Kaisaniemi (fmisid 100971) | Finnish Meteorological Institute open data | CC BY 4.0 |
+| City bike stations: city, capacity, coordinates (2021 list) | HSL, Helsingin ja Espoon kaupunkipyöräasemat (`ingestion/stations.py`) | CC BY 4.0 |
+| Ride time rule change (30 to 60 minutes, 2024) | City of Espoo news, March 2024 | Reference |
 | Finnish public holidays | `holidays` Python package | MIT |
 
 Definitions and limitations: [docs/metrics.md](docs/metrics.md).
@@ -145,6 +147,30 @@ temperature, rain, day off and the start or end of the season explains 77% of da
 variation, with a typical error of about 1,800 trips. The dashboard's *Estimate a day* tab
 lets anyone try it.
 
+**8. Helsinki carries 87% of trips, and its stations work more than twice as hard.**
+Helsinki stations average 29 trips a day each, Espoo stations 13. Both cities react to rain
+(-25%) and to days off (-20%) almost identically. Only 2.7% of trips cross the city border.
+
+**9. The busiest routes are short campus and harbour hops.** The top route is
+Jämeräntaival to Aalto-yliopisto (M) in Otaniemi, Espoo: 35,123 trips at about 0.8 km, with
+almost as many in the other direction. Next come Arielinkatu and Sompasaari in Kalasatama, and
+several routes between Itämerentori and the Länsisatama area.
+
+**10. Doubling the free ride time changed how people ride.** 46% of trips take under 10
+minutes and only 3% are round trips. In 2024 the included ride time was doubled from 30 to 60
+minutes in both cities. The share of trips over 30 minutes jumped from 3.1% (2023) to 11.8%
+(2024) and 12.6% (2025), and the average trip grew by about 0.4 km. Days off have more long and
+round trips than working days. Tuesday is the busiest day of the week and Sunday the quietest
+(-23%).
+
+**11. Some days people stay in, some days they go out, and the map shows where.** Compared
+with a normal day: Midsummer Eve, Good Friday, Easter and May Day are quiet ("stay in"
+days). Vappu Eve is the one day people clearly go out (+45%): arrivals at the Otaniemi
+campus stations more than double, and trips starting at 23:00 run at more than three times
+the usual level. Even quiet Midsummer Eve has its hotspot: Seurasaari, home of the
+traditional Midsummer bonfires, gets almost three times its usual arrivals. On Helsinki Day
+the extra trips go to the centre and Linnanmäki.
+
 ### Who this is useful for
 
 - **Riders and residents:** the busiest times are warm, dry working days around 8:00 and
@@ -196,14 +222,16 @@ monitor. Loading and modelling the first full season used 0.15 credits.
 - Derived October 2021 durations use local timestamps; trips crossing the daylight saving
   change on 31 October 2021 may be off by an hour.
 - Station net flow does not include the operator's own redistribution trips.
+- Station locations come from HSL's 2021 station list; 12 stations later moved or were renamed
+  and 7 small or test stations are missing from it (0.4% of departures).
 - Findings are associations, not causal estimates.
 
 ## Next steps
 
 - Incremental model for `fct_trips` and a snapshot of station names (SCD2)
-- Station coordinates and city from HSL's station dataset, then a map
 - A station-ID mapping so codes like `*40` can be kept instead of excluded
 - Helsinki cyclist counter data (year-round) and the "did cycling decline?" question
+- Compare with the new regional city bike system planned from 2026
 - Spatial joins: population (Statistics Finland Paavo), universities, metro stations
 - Next-day station risk model
 - Rebuild the core on Microsoft Fabric
