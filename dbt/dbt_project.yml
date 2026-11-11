@@ -1,0 +1,56 @@
+name: helsinki_citybikes
+version: "1.0.0"
+config-version: 2
+profile: helsinki_citybikes
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages", "logs"]
+
+vars:
+  # Project rules for a valid trip (documented in docs/metrics.md).
+  min_trip_seconds: 10
+  max_trip_seconds: 18000      # 5 hours
+  min_trip_metres: 10
+  rainy_day_mm: 1.0            # a "rainy day" has at least 1 mm of rain
+
+models:
+  helsinki_citybikes:
+    staging:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table
+    quality:
+      +schema: quality
+      +materialized: table
+
+seeds:
+  helsinki_citybikes:
+    +schema: reference
+    calendar:
+      +column_types:
+        date_day: date
+        year: integer
+        month: integer
+        day_of_month: integer
+        iso_weekday: integer
+        weekday_name: varchar
+        is_weekend: boolean
+        is_public_holiday: boolean
+        holiday_name: varchar
+    special_days:
+      +column_types:
+        date_day: date
+        special_day_name: varchar
+        special_day_type: varchar
+    official_trip_totals:
+      +column_types:
+        year: integer
+        official_trips: integer
+        scope: varchar
+        source: varchar

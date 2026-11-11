@@ -1,0 +1,13 @@
+# Versions tested together on 2026-11-11 (Python 3.11-3.13)
+dbt-core==1.12.6
+dbt-snowflake==1.12.5
+dbt-duckdb==1.11.1
+duckdb==2.0.0
+snowflake-connector-python==5.2.0
+cryptography>=42
+pandas>=2.2
+pyarrow>=17
+requests>=2.32
+holidays==0.108
+streamlit>=1.50
+altair>=5

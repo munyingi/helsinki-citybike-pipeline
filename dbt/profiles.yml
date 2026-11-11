@@ -1,0 +1,28 @@
+# No secrets in this file: everything comes from environment variables (.env).
+helsinki_citybikes:
+  target: snowflake
+  outputs:
+    snowflake:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER', 'DBT_USER') }}"
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'TRANSFORMER') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'CITYBIKE_WH') }}"
+      database: CITYBIKE
+      schema: dev
+      threads: 4
+
+    # Local and post-trial target: same models, free, runs on a laptop.
+    duckdb:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '../data/citybike.duckdb') }}"
+      schema: dev
+      threads: 4
+
+    # CI target: synthetic fixtures only.
+    ci:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '../data/citybike.duckdb') }}"
+      schema: dev
+      threads: 1

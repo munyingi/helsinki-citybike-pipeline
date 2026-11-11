@@ -1,0 +1,25 @@
+# Secrets
+.env
+keys/
+*.p8
+*.pem
+
+# Data (raw files are large and re-downloadable; trip-level data is never committed).
+# data/exports/ IS committed: it holds only small aggregate tables for the dashboard.
+data/raw/
+data/landing/
+data/*.duckdb
+data/*.duckdb.wal
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.user.yml

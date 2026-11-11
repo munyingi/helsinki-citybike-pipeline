@@ -1,0 +1,28 @@
+version: 2
+
+sources:
+  - name: raw
+    database: "{{ target.database }}"
+    schema: raw
+    description: Files loaded as text by ingestion/*.py. Never edited by hand.
+    tables:
+      - name: trips
+        description: >
+          HSL city bike Origin-Destination trips for Helsinki and Espoo
+          (City Bike Finland, CC BY 4.0). One row per trip, all columns text.
+        config:
+          loaded_at_field: loaded_at
+        columns:
+          - name: source_file
+            description: Normalised landing file the row came from, e.g. trips_2025-05.csv.gz
+            data_tests: [not_null]
+      - name: weather_daily
+        description: >
+          FMI daily observations in long format (one row per date and parameter),
+          Helsinki Kaisaniemi station 100971. CC BY 4.0.
+        columns:
+          - name: parameter
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ["rrday", "tday", "tmin", "tmax", "snow"]

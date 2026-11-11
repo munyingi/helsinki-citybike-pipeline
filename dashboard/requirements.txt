@@ -1,0 +1,5 @@
+# Light dependency file for Streamlit Community Cloud (it looks next to app.py first).
+streamlit>=1.50
+pandas>=2.2
+pyarrow>=17
+altair>=5
