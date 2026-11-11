@@ -17,10 +17,27 @@ typed as (
         try_cast(return_station_id as integer)      as return_station_id,
         trim(return_station_name)                   as return_station_name,
         try_cast(covered_distance_m as double)      as distance_m,
-        try_cast(duration_sec as double)            as duration_s,
+        try_cast(duration_sec as double)            as duration_s_reported,
         source_file,
         loaded_at
     from source
+
+),
+
+filled as (
+
+    -- October 2021 was published with an empty duration column. Where the
+    -- duration is missing but both timestamps exist, derive it from them.
+    select
+        *,
+        coalesce(
+            duration_s_reported,
+            cast({{ dbt.datediff('departed_at', 'returned_at', 'second') }} as double)
+        )                                                as duration_s,
+        duration_s_reported is null
+          and departed_at is not null
+          and returned_at is not null                    as is_duration_derived
+    from typed
 
 ),
 
@@ -28,7 +45,7 @@ deduplicated as (
 
     -- Exact duplicate rows (same everything) are kept once.
     select *
-    from typed
+    from filled
     qualify row_number() over (
         partition by departed_at, returned_at, departure_station_id, return_station_id,
                      distance_m, duration_s

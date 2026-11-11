@@ -64,6 +64,7 @@ with tab_overview:
         alt.Chart(d).mark_line().encode(
             x=alt.X("trip_date:T", title=None),
             y=alt.Y("trips:Q", title="Trips"),
+                        detail="year(trip_date):O",
             tooltip=["trip_date:T", "trips:Q", "temp_mean_c:Q", "precipitation_mm:Q"],
         ),
         width="stretch",
@@ -90,7 +91,8 @@ with tab_weather:
 with tab_calendar:
     by_type = d.assign(
         day_type=d.apply(
-            lambda r: r["holiday_name"] if pd.notna(r["holiday_name"])
+            lambda r: r["special_day_name"] if pd.notna(r["special_day_name"])
+            else r["holiday_name"] if pd.notna(r["holiday_name"])
             else ("Weekend" if r["is_weekend"] else "Working day"),
             axis=1,
         )
