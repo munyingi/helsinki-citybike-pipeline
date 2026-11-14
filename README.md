@@ -257,3 +257,11 @@ monitor. Loading and modelling the first full season used 0.15 credits.
 - Spatial joins: population (Statistics Finland Paavo), universities, metro stations
 - Next-day station risk model
 - Rebuild the core on Microsoft Fabric
+
+## Licence
+
+Code is released under the [MIT License](LICENSE). The data belongs to its publishers and is used under CC BY 4.0 (see [Data sources](#data-sources)).
+
+## Author
+
+**Samwel Kamau Munyingi** · [LinkedIn](https://www.linkedin.com/in/samwel-munyingi-352a88161) · [GitHub](https://github.com/munyingi)
